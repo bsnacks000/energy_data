@@ -1,0 +1,30 @@
+---
+title: "Regression Analysis Assignment 1"
+output: html_notebook
+---
+
+The CSV data file (above) contains 24 months of electricity consumption data for an office building in New York City, as well as average monthly outdoor air temperature (OAT) for each of the corresponding months. To successfully complete this assignment, you will:
+
+- Read the CSV file into the RStudio environment, then create a data frame containing just the electricity and OAT data.
+
+- Use the installed stats package, or any other package of your choosing, to generate a generalized linear model of the electricity consumption vs. the OAT data.
+
+- Plot the data with the best fit regression line and generate summary statistics for the model that include the adjusted R-squared value.
+
+- Use the segmented R package to generate a segmented (piecewise) linear regression model of the electricity consumption vs. the OAT data.
+
+- Plot the data with the best fit lines and generate summary statistics for the model that include the adjusted R-squared value and the change-point (breakpoint).
+
+Answer the following questions:
+
+How are the two models different, with regard to:
+Appearance
+Adjusted R-squared values
+What does the segmented model tell you about the building, through the:
+Change-point (breakpoint)
+Slope(s) of the best fit lines
+
+```{r}
+
+```
+
