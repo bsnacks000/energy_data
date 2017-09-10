@@ -15,9 +15,7 @@ parse_energy_files = function(root_dir){
         names(oat) = c('month', 'day', 'year', 'OAT')
         
         oat <<- oat
-        monthly_data = read.csv(file.path(root_dir,'data', 'monthly_data.csv'), header=T)
-        
-        
+        monthly_data <<- read.csv(file.path(root_dir,'data', 'monthly_data.csv'), header=T, stringsAsFactors = F)
     }
       
     monthly_avg_oat = function(){
@@ -28,17 +26,19 @@ parse_energy_files = function(root_dir){
         monthly_oat <<- monthly_oat[,3:4]
     }
     
-    join_drop = function(){
-        merged_df <<- merge(monthly_data, monthly_oat,x.by=c('End_Date'), y.by=c('end_date'))
-        
-    }
+    
     
     init(root_dir)
     monthly_avg_oat()
-    join_drop()
 
-    return(merged_df)
-
+    return(list(oat=monthly_oat, data=monthly_data))
+    
 }
 
-parse_energy_files(getwd())
+
+slice_oat_by_end_date = function(start, end, oat_df){
+    oat_df[oat_df$end_date >= start & oat_df$end_date <= end,]$OAT 
+}
+
+
+

@@ -1,30 +1,113 @@
 ---
 title: "Regression Analysis Assignment 1"
-output: html_notebook
+output:
+  html_notebook: default
+  html_document: default
 ---
 
 The CSV data file (above) contains 24 months of electricity consumption data for an office building in New York City, as well as average monthly outdoor air temperature (OAT) for each of the corresponding months. To successfully complete this assignment, you will:
 
-- Read the CSV file into the RStudio environment, then create a data frame containing just the electricity and OAT data.
 
-- Use the installed stats package, or any other package of your choosing, to generate a generalized linear model of the electricity consumption vs. the OAT data.
+### Data Cleaning and Basic Plot
 
-- Plot the data with the best fit regression line and generate summary statistics for the model that include the adjusted R-squared value.
+- _Read the CSV file into the RStudio environment, then create a data frame containing just the electricity and OAT data._
 
-- Use the segmented R package to generate a segmented (piecewise) linear regression model of the electricity consumption vs. the OAT data.
-
-- Plot the data with the best fit lines and generate summary statistics for the model that include the adjusted R-squared value and the change-point (breakpoint).
-
-Answer the following questions:
-
-How are the two models different, with regard to:
-Appearance
-Adjusted R-squared values
-What does the segmented model tell you about the building, through the:
-Change-point (breakpoint)
-Slope(s) of the best fit lines
+We generate the utility df by averaging the monthly OAT data and slicing the results to line up with the consumption dataframe.
 
 ```{r}
 
+setwd("~/Documents/honeys_class/energy_data/regression_analysis")
+source('parse_energy_files.R')
+require(ggplot2)
+require(segmented)
+require(scales)
+
+data = parse_energy_files(getwd())  # parses csvs and constructs average monthly oat from daily oat
+oat = data$oat
+consumption = data$data
+
+start = as.Date('2014-07-31','%Y-%m-%d')
+end = as.Date('2016-06-30', '%Y-%m-%d')
+
+oat = slice_oat_by_end_date(start, end, oat)
+elec = consumption$Elec
+
+elec_utility = data.frame(oat, elec)
+elec_utility
+
 ```
+
+
+A quick look at how electricity consumption increases with average monthly temperature
+```{r}
+ggplot(data=elec_utility, aes(x=oat, y=elec)) +
+    geom_point() +
+    ggtitle('OAT vs. Electricitiy Consumption')
+```
+
+
+- _Use the installed stats package, or any other package of your choosing, to generate a generalized linear model of the electricity consumption vs. the OAT data. Plot the data with the best fit regression line and generate summary statistics for the model that include the adjusted R-squared value._
+
+
+### Simple Linear Regression
+
+A basic linear regression. Electricity consumption is set as the response variable to monthly average outside air temperature.
+
+```{r}
+
+# generating a basic linear regression from elec ~ oat
+
+regr = lm(elec ~ oat,data = elec_utility)
+summary(regr)
+
+```
+
+
+```{r}
+ggplot(data=elec_utility, aes(x=oat, y=elec)) +
+    geom_point() +
+    geom_smooth(method='lm',formula=y~x, se=F) +
+    scale_x_continuous(breaks=pretty_breaks(10)) +
+    scale_y_continuous(breaks=pretty_breaks(8)) +
+    ggtitle('Basic Linear Regression of OAT vs. Electricity Consumption')
+```
+
+
+- _Use the segmented R package to generate a segmented (piecewise) linear regression model of the electricity consumption vs. the OAT data. Plot the data with the best fit lines and generate summary statistics for the model that include the adjusted R-squared value and the change-point (breakpoint)._
+
+
+### Piecewise Regression using segmented()
+
+We wrap the results of the linear regression in a segmented.lm() method to derive a change point for the model
+
+```{r}
+seg_regr = segmented.lm(regr, seg.Z= ~oat,control=seg.control(display=F, K=4, stop.if.error=FALSE))   
+summary(seg_regr)
+```
+
+Looking at the slopes of both 
+
+```{r}
+slope(seg_regr)
+```
+
+```{r}
+ggplot(data=elec_utility, aes(x=oat, y=elec)) +
+    geom_point() +
+    geom_line(aes(x=oat, y=broken.line(seg_regr)$fit), color='blue') +
+    geom_vline(xintercept=summary.segmented(seg_regr)$psi[1,2], linetype='dashed') +
+    scale_x_continuous(breaks=pretty_breaks(10)) +
+    scale_y_continuous(breaks=pretty_breaks(8)) + 
+    ggtitle('Segmented Regression of OAT vs. Electricity Consumption')
+```
+
+_Answer the following questions:_
+
+How are the two models different, with regard to:
+-Appearance
+-Adjusted R-squared values
+
+What does the segmented model tell you about the building, through the:
+- Change-point (breakpoint)
+- Slope(s) of the best fit lines
 
