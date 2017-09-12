@@ -6,6 +6,22 @@ output:
 ---
 
 The CSV data file (above) contains 24 months of electricity consumption data for an office building in New York City, as well as average monthly outdoor air temperature (OAT) for each of the corresponding months. To successfully complete this assignment, you will:
+```{r}
+require(timeDate)
+
+root_dir = getwd()
+oat = read.csv(file.path(root_dir, 'data', 'oat.tsv'),sep='', header=F)
+names(oat) = c('month', 'day', 'year', 'OAT')
+
+monthly_oat = aggregate(oat$OAT, by=list(oat$month, oat$year), mean)
+names(monthly_oat) = c('month','year', 'OAT')
+monthly_oat
+
+monthly_data = read.csv(file.path(root_dir,'data', 'monthly_data.csv'), header=T, stringsAsFactors = F)
+
+monthly_oat$end_date = timeLastDayInMonth(anytime::anydate(with(monthly_oat, paste(year, month))))
+monthly_oat
+```
 
 
 ### Data Cleaning and Basic Plot
@@ -34,7 +50,6 @@ elec = consumption$Elec
 
 elec_utility = data.frame(oat, elec)
 elec_utility
-
 ```
 
 
@@ -106,6 +121,8 @@ _Answer the following questions:_
 How are the two models different, with regard to:
 -Appearance
 -Adjusted R-squared values
+
+
 
 What does the segmented model tell you about the building, through the:
 - Change-point (breakpoint)

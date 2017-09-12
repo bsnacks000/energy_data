@@ -21,7 +21,7 @@ parse_energy_files = function(root_dir){
     monthly_avg_oat = function(){
         monthly_oat = aggregate(oat['OAT'],by = list(oat$month,oat$year), mean)
         names(monthly_oat) = c('month', 'year', 'OAT')
-        monthly_oat$end_date = anytime::anydate(with(monthly_oat, paste(year, month))) - lubridate::days(1)
+        monthly_oat$end_date = as.Date(timeLastDayInMonth(anytime::anydate(with(monthly_oat, paste(year, month)))))
         
         monthly_oat <<- monthly_oat[,3:4]
     }
