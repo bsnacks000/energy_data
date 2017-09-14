@@ -1,8 +1,8 @@
 ---
 title: "Regression Analysis Assignment 1"
 output:
-  html_notebook: default
   html_document: default
+  html_notebook: default
 ---
 
 The CSV data file (above) contains 24 months of electricity consumption data for an office building in New York City, as well as average monthly outdoor air temperature (OAT) for each of the corresponding months. To successfully complete this assignment, you will:
@@ -102,13 +102,17 @@ ggplot(data=elec_utility, aes(x=oat, y=elec)) +
 
 _Answer the following questions:_
 
-How are the two models different, with regard to:
+_How are the two models different, with regard to:_
 -Appearance
 -Adjusted R-squared values
 
+The initial model is a 2P (non-breakpoint) regression line with an adjusted-R2 of .63. The 4P breakpoint model changes slope at an OAT of 62 with an adjusted R2 of .89. The 4P is significantly more accurate with its high adjusted R2 value.
 
 
-What does the segmented model tell you about the building, through the:
+
+_What does the segmented model tell you about the building, through the:_
 - Change-point (breakpoint)
 - Slope(s) of the best fit lines
+
+The slope above the change point shows that as OAT increases past 62.7, the rate of energy consumption dramatically increases. It could be inferred from the model that this is energy spent on cooling the building during hot months. The slope to the left of the change point is relatively flat, with only a slight increase in energy output as OAT increases. It can be inferred that the baseload of the building sits around 2800 kwH.  
 
