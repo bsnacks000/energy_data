@@ -1,0 +1,119 @@
+---
+title: "Electricity Demand"
+output: html_notebook
+---
+
+The CSV data files (above) contain daily electricity demand data for an office building in New York City – one contains data for the 5-year period 2011-2015 and the other for 2016. To successfully complete this assignment, you will:
+
+Read the 2011-2015 CSV file into the RStudio environment, then generate summary statistics and a time series chart.
+
+ -First use prophet package to create a model for the 2011-2015 data, breaking out the seasonality of the data and the actual trend in demand. Determine the level of seasonality based upon what you have learned about electricity demand data in a climate like that of New York City. Generate charts for the raw data, seasonality and trend.
+ 
+- Use the prophet package to forecast data for 2016; store the data in a data frame for subsequent analysis.
+
+- Then use the stR package to repeat what was done with the prophet package in Step 2.
+
+- Use the forecast package to forecast 2016 data, taking care to choose the most appropriate forecasting method for this type of data; add the forecasted data to the to the data frame you created in Step 3.
+
+- Use at least three different statistical metrics to compare the two forecasted datasets to the actual 2016 data (contained in the 2016 CSV file) and determine which package (prophet or stR) was best at forecasting 2016 data (i.e., which dataset more closely matched the actual 2016 data when looking at the results of the three statistical tests).
+
+```{r}
+
+require(ggplot2)
+require(prophet)
+require(forecast)
+require(stR)
+
+
+# load and change to date format 
+f = file.path('data','daily_demand_11-15.csv')
+elec_demand_2011_2015 = read.csv(f, stringsAsFactors = F)
+f = file.path('data', 'daily_demand_16.csv')
+elec_demand_2016 = read.csv(f, stringsAsFactors = F)
+rm(f)
+
+elec_demand_2011_2015$ds = as.Date.character(elec_demand_2011_2015$ds, '%m/%d/%Y')
+elec_demand_2016$ds = as.Date.character(elec_demand_2016$ds, '%m/%d/%Y')
+
+```
+
+### Summary Statistics 2011-2015
+```{r}
+summary(elec_demand_2011_2015$y)
+```
+
+### Time Series using ggplot
+
+```{r}
+
+ggplot(data = elec_demand_2011_2015, aes(x=ds, y=y)) + 
+    geom_line() +
+    xlab('Days (2011-2015)') + 
+    ylab('Electricity Demand - kwH') +
+    ggtitle('Daily Electricity Demand (2011-2015)')
+
+
+```
+
+### Prophet Package
+
+```{r}
+mod = prophet(elec_demand_2011_2015, yearly.seasonality = T)
+```
+```{r}
+f = make_future_dataframe(mod,periods=365)
+future = predict(mod, f)
+
+```
+
+```{r}
+plot(mod, future)
+
+```
+```{r}
+prophet_plot_components(mod, future)
+```
+
+
+### stR package for STR decomposition
+```{r}
+t = msts(elec_demand_2011_2015$y,seasonal.periods = c(7, 365.25), start=c(2011,1)) # convert to a multi-time-series with weekly and yearly seasonality
+fit = AutoSTR(t, gapCV=48,confidence=0.95)
+
+#t1 = ts(elec_demand_2011_2015$y, frequency=365)
+#fit = AutoSTR(t1)  # NOTE load this from environment var because it takes forever to run 
+```
+
+```{r}
+plot(fit)
+```
+
+#### Using forecast
+
+```{r}
+require(tseries)
+
+# stationary test
+adf.test(complete.cases(t1))
+
+```
+ According to this test the ts data is considered stationary. So we can use auto.arima to predict the values
+
+```{r}
+fore = forecast(auto.arima(t1))
+```
+
+```{r}
+plot(fore)
+```
+
+### Comparison with actual 2016 dataset
+```{r}
+
+```
+
+
+```{r}
+
+
+```
