@@ -1,6 +1,8 @@
 ---
 title: "Electricity Demand"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
 ---
 
 The CSV data files (above) contain daily electricity demand data for an office building in New York City – one contains data for the 5-year period 2011-2015 and the other for 2016. To successfully complete this assignment, you will:
@@ -37,12 +39,10 @@ elec_demand_2016$ds = as.Date.character(elec_demand_2016$ds, '%m/%d/%Y')
 
 ```
 
-### Summary Statistics 2011-2015
+### Summary Statistics and Time Series 2011-2015
 ```{r}
 summary(elec_demand_2011_2015$y)
 ```
-
-### Time Series using ggplot
 
 ```{r}
 
@@ -55,10 +55,27 @@ ggplot(data = elec_demand_2011_2015, aes(x=ds, y=y)) +
 
 ```
 
-### Prophet Package
+```{r}
+ggplot(data = elec_demand_2011_2015[1:30,], aes(x=ds, y=y)) + 
+    geom_line() +
+    xlab('Days') + 
+    ylab('Electricity Demand - kwH') +
+    ggtitle('Daily Electricity Demand For Single Month (Jan 2011)')
+
+```
+
+
+The summary statistics show an overall mean value of 547.65 kwH electricity demand. There are 33 missing data points as seen in the summary as well as the gap in the time series chart. These missing values will have to be removed for the forecast package.
+
+The time series plots show that there is periodicity on both the weekly and yearly levels. This is due to a reduction in electricity demand on weekends and an increase in electricity demand during summer months.
+
+
+### Prediction using Prophet Package
+
+The prophet package is used to predict 365 days given yearly and weekly seasonality in the data.
 
 ```{r}
-mod = prophet(elec_demand_2011_2015, yearly.seasonality = T)
+mod = prophet(elec_demand_2011_2015, yearly.seasonality = T, weekly.seasonality = T)
 ```
 ```{r}
 f = make_future_dataframe(mod,periods=365)
@@ -74,46 +91,181 @@ plot(mod, future)
 prophet_plot_components(mod, future)
 ```
 
+The decomposition shows a sharply decreasing trend from 2011-2013, a slight rise in 2014 and gradual decrease predicted for demand moving into 2016 centered around 550 kwH.
+
 
 ### stR package for STR decomposition
+
+A similar decomposition is used with the stR package. The seasonal demand values are converted to a multi-seasonal time series 
+
 ```{r}
 t = msts(elec_demand_2011_2015$y,seasonal.periods = c(7, 365.25), start=c(2011,1)) # convert to a multi-time-series with weekly and yearly seasonality
-fit = AutoSTR(t, gapCV=48,confidence=0.95)
 
-#t1 = ts(elec_demand_2011_2015$y, frequency=365)
-#fit = AutoSTR(t1)  # NOTE load this from environment var because it takes forever to run 
 ```
 
+
 ```{r}
+#fit = AutoSTR(t, gapCV=48,confidence=0.95)
+#saveRDS(fit,'auto_str_fit.rds')
+fit = readRDS('auto_str_fit.rds')
+
 plot(fit)
 ```
 
+The AutoSTR decomposition shows a similiar shaped trend to the prophet result. One additional feature that AutoSTR conveniently shows in the amount of noise in the signal. One can see that the summer months are much more volatile and show a much higher degree of unpredictability than the winter months.
+
+
+
 #### Using forecast
 
-```{r}
-require(tseries)
-
-# stationary test
-adf.test(complete.cases(t1))
-
-```
- According to this test the ts data is considered stationary. So we can use auto.arima to predict the values
+Both snaive and auto.arima methods were used to forecast 2016 data. Note that D=1 must be set in auto.arima in order for it to be able to detect the seasonality in the time series object.
 
 ```{r}
-fore = forecast(auto.arima(t1))
+#aarima_model = auto.arima(t, D=1)
+#saveRDS(aarima_model,'aarima_model.RDS')
+#aarima_model = readRDS('aarima_model.RDS')
+#f_arima = forecast(aarima_model, h=365)
+#saveRDS(f_arima,'f_arima.rds')
+
+f_arima = readRDS('f_arima.rds')
 ```
 
 ```{r}
-plot(fore)
+plot(f_arima)
+
 ```
+
+
+```{r}
+
+#snaive_fmodel = snaive(t, h=365)
+#saveRDS(snaive_fmodel, 'snaive_model.rds')
+snaive_fmodel = readRDS('snaive_model.rds')
+plot(snaive_fmodel)
+
+```
+
+Both of these models show a similar result in the prediction. Both appear to overfit some of the variability in the summer months.
 
 ### Comparison with actual 2016 dataset
 ```{r}
+ggplot(data = elec_demand_2016, aes(x=ds, y=y)) + 
+    geom_line() +
+    xlab('Days (2016)') + 
+    ylab('Electricity Demand - kwH') +
+    ggtitle('Daily Electricity Demand (2016')
 
 ```
+
+```{r}
+require(reshape2)
+
+s = snaive_fmodel$mean
+aa = f_arima$mean
+
+proph_ds_slice = data.frame(as.Date(future$ds), future$yhat)
+colnames(proph_ds_slice) = c('ds','proph_mean')
+
+elec = merge(elec_demand_2016, proph_ds_slice, by='ds',all.x=T)[-length(elec_demand_2016),]
+elec$aa_mean = as.numeric(aa)
+elec$snaive_mean = as.numeric(s)
+
+colnames(elec)[2] = 'actual'
+# melt for graph
+elec_melt = melt(elec,id='ds', variable.name='demand')
+
+plot_compare = function(demand_var_name){
+    ggplot(data=elec_melt[(elec_melt$demand=='actual') | (elec_melt$demand==demand_var_name),], 
+       aes(x=ds, y=value, colour=demand)) +
+     geom_line()
+}
+
+
+```
+
+
+
+### plot comparisons of means from the three models
+**Comparison of prophet yhat value after using predict() with actual 2016 demand**
+```{r}
+plot_compare('proph_mean')
+```
+
+The prophet mean prediction is much smoother over the summer months as compared to the actual 2016 demand. This variablity is accounted for if you also take into consideration the upper and lower bounds of the y_hat variable.
 
 
 ```{r}
+future_2016 = future[as.Date(future$ds) >= as.Date('2016-01-01'),]
 
+future_2016_yhats = data.frame(as.Date(future_2016$ds),future_2016$yhat_lower, future_2016$yhat_upper,future_2016$yhat)
+colnames(future_2016_yhats) = c('ds','yhat_lower','yhat_upper', 'yhat')
+proph_yhat_actual = merge(future_2016_yhats, elec_demand_2016, by='ds',all.x=T)
+colnames(proph_yhat_actual)[5] = 'actual'
+
+ggplot(data=melt(proph_yhat_actual,id='ds', variable.name='demand'),aes(x=ds, y=value, colour=demand)) + geom_line()
 
 ```
+
+
+**Comparison of snaive mean value using forecast with acutal 2016 demand**
+```{r}
+plot_compare('snaive_mean')
+```
+
+**Comparison of auto.arima mean value using forecast with actual 2016 demand**
+```{r}
+plot_compare('aa_mean')
+```
+
+The auto.arima and snaive are almost identical in their overall shape. The predictions from both do not seem to capture the mean trend of the summer months as clearly the prophet package. Too much of the volatility in previous summer months were taken into account from May through September. 
+
+
+### Analysis of actual vs. predicted results
+
+We can assess the accuracy using correlation tests and statistical measurements derived from simple linear regression by plotting the relationaship between the predicted values against the actual demand. In general positively correlated results are an indication that the predicted model is accurate.
+
+
+**Acutal demand vs. prophet**
+
+```{r}
+ggplot(data=elec, aes(x=elec$actual,y=elec$proph_mean)) + 
+    geom_point() + 
+    geom_smooth(method='lm')
+```
+A look at the scatter plot with an lm regression line shows a postiive correlation between the data.
+
+```{r}
+cor.test(elec$actual, elec$proph_mean, method = "pearson", conf.level = 0.95)
+```
+A Pearson correlation test at 0.95 CI shows an R value of 0.84 and statistically significant p-value. This means that the data is highly-correlated.
+
+```{r}
+summary(lm(actual~ proph_mean,data=elec))
+```
+
+The actual linear regression summary gives decently accurate model with a high adjusted R2 value with a statistically significant p-value. The F-statistic is another indicator of a relationship between the data and is quite high at 889.
+
+
+**Acutal demand vs. snaive**
+Since the shape of the auto.arima and snaive results were almost identical, we will only look at the snaive results  .
+
+```{r}
+ggplot(data=elec, aes(x=elec$actual,y=elec$snaive_mean)) + 
+    geom_point() + 
+    geom_smooth(method='lm')
+```
+
+The scatterplot with lm line shows a slightly less positive correlation between the actual and predicted results than the prophet results. Both the Pearson correlation and linear regression model agree with this assessment.. 
+
+
+```{r}
+cor.test(elec$actual, elec$snaive_mean, method = "pearson", conf.level = 0.95)
+```
+The R2 of the Pearson correlation shows an R2 value of 0.67, which indicates that the predictions are less correlated with the actual results than prophet. 
+
+```{r}
+summary(lm(actual~ aa_mean,data=elec))
+```
+
+The lm model summary shows an adj-R2 of 0.45 and F-statistic of 309. These are both an indication that the linear regression fit is poor between the actual and predicted results. 
+
