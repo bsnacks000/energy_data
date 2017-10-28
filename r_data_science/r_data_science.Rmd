@@ -1,0 +1,216 @@
+---
+title: "Exploratory Data Analysis"
+output: html_notebook
+---
+
+### Chapter 5
+```{r}
+library(tidyverse)
+
+```
+
+** 90-1 **
+Explore the distribution of each of the x, y, and z variables in diamonds. What do you learn? Think about a diamond and how you might decide which dimension is the length, width, and depth.
+
+
+
+```{r}
+
+# pull each column for histogram analysis and remove outliers using thresholds
+x = diamonds %>% select(x) %>% filter(x > 2 & x < 20)
+y = diamonds %>% select(y) %>% filter(y > 2 & y < 20)
+z = diamonds %>% select(z) %>% filter(z > 2 & z < 20)
+
+
+```
+
+
+```{r}
+summary(x)
+ggplot(data=x) + geom_histogram(binwidth = 0.25,aes(x=x)) +
+    geom_vline(xintercept=5.7,colour='red', linetype=2) + # mean and median almost the same
+    geom_vline(xintercept=4.7, colour='light blue') +
+    geom_vline(xintercept=6.5, colour='light blue')
+```
+
+
+```{r}
+summary(y)
+
+ggplot(data=y) + geom_histogram(binwidth = 0.25,aes(x=y)) +
+    geom_vline(xintercept=5.7,color='red', linetype=2) + # mean and median almost the same
+    geom_vline(xintercept=4.7, colour='light blue') +
+    geom_vline(xintercept=6.5, colour='light blue')
+
+```
+
+
+```{r}
+summary(z)
+ggplot(data=z) + geom_histogram(binwidth = 0.25,aes(x=z)) +
+    geom_vline(xintercept=3.5, colour='red', linetype=2) + # mean and median almost the same
+    geom_vline(xintercept=2.9, colour='light blue') +
+    geom_vline(xintercept=4.0, colour='light blue')
+```
+
+At high binwidth, each of the histograms and summary statistics show normal distributions. The x and y (length and width) are almost identical in terms of spread, mean and inter-quartile range . This makes sense considering the shape of a diamond tends to be proportional. The spread for z(depth) is tighter, meaning there is less variability in overall diamond depth in the dataset. 
+
+
+
+**91-2**
+
+Explore the distribution of price. Do you discover anything unusual or surprising? (Hint: Carefully think about the binwidth and make sure you try a wide range of values.)
+```{r}
+price = diamonds %>% select(price) %>% filter(price > 100 & !is.na(price))
+```
+
+```{r}
+summary(price)
+ggplot(data=price) + geom_histogram(binwidth=2500,aes(x=price)) +
+    geom_vline(xintercept=3933, colour='red', linetype=2) +  # mean
+    geom_vline(xintercept=2401, colour='orange', linetype=2) + # median 
+    geom_vline(xintercept=950, colour='light blue') +
+    geom_vline(xintercept=5324, colour='light blue')
+
+```
+
+
+```{r}
+ggplot(price) + geom_histogram(aes(x=price),binwidth=300)+
+    geom_vline(xintercept=3933, colour='red', linetype=2) +  # mean
+    geom_vline(xintercept=2401, colour='orange', linetype=2) +  # median
+    geom_vline(xintercept=950, colour='light blue') +
+    geom_vline(xintercept=5324, colour='light blue')
+```
+
+
+```{r}
+summary(price)
+ggplot(price) + geom_histogram(aes(x=price),binwidth=25)+
+    geom_vline(xintercept=3933, colour='red', linetype=2) +  #mean 
+    geom_vline(xintercept=2401, colour='orange', linetype=2) + # median
+    geom_vline(xintercept=950, colour='light blue') +
+    geom_vline(xintercept=5324, colour='light blue')
+```
+
+The summary data and overall shape of the histogram shows a right skewed distribution. There is a higher frequency of prices below 1000.
+
+Although high binwidths reflect this assessment, certain details in the shape of the distribution become evident only as binwidth is increased. As the resolution is increased a gap emerges in the dataset. This shows a certain price range was excluded from the dataset which might have an impact on the mean and median of the distribution.
+
+
+**93-2**
+
+What happens to missing values in a histogram? What happens to missing values in a bar chart? Why is there a difference?
+
+```{r}
+
+# adding NAs randomly to see effect 
+
+na_idx = sample(1:53940, 200)
+price_w_na = price
+price_w_na[na_idx,] = NA
+
+ggplot(data=price_w_na) + geom_histogram(aes(x=price_w_na),binwidth=1000)
+
+```
+
+
+```{r}
+cut_w_na = diamonds$cut
+cut_w_na = addNA(cut_w_na)
+
+na_idx = sample(1:53940, 1500)
+cut_w_na[na_idx] = NA
+
+df = data.frame(cut=cut_w_na, price=diamonds$price)
+
+ggplot(data=df) + 
+    geom_histogram(aes(x=cut, y=price), stat='identity')
+```
+
+A histogram will remove any NAs before plotting since the graph represents the distribution of a single continuous variable and an NA is an undefined value.
+
+A bar plot contains both categorical and continuous variables and if there are NAs in the factor, then NA is simply treated as another category.
+
+
+**99-2**
+
+What variable in the diamonds dataset is most important for predicting the price of a diamond? How is that variable correlated with cut? Why does the combination of those two relationships lead to lower quality diamonds being more expensive?
+
+```{r}
+
+ggplot(data = diamonds, mapping = aes(x=reorder(cut,price,FUN=median),y=price, fill=cut)) +
+  geom_boxplot()
+
+```
+
+```{r}
+cor(diamonds$carat, diamonds$price) # extreme correlation between carat and price
+```
+
+```{r}
+summary(lm(price~carat, data=diamonds))  # high R-squared here confirms a good prediction
+```
+
+
+
+```{r}
+ggplot(data = diamonds, mapping = aes(x = carat, y = price), alpha=1/100) +
+    geom_point(alpha=.25) +
+    geom_smooth(method='lm') + ylim(0,20000)
+
+```
+
+```{r}
+# similar boxplot shows fair 
+ggplot(data=diamonds, aes(reorder(cut,carat,FUN=median),y=carat, fill=cut)) +
+    geom_boxplot()
+
+```
+**104-3**
+
+How does the price distribution of very large diamonds compare to small diamonds. Is it as you expect, or does it surprise you?
+
+```{r}
+diamonds1 = diamonds %>% filter(x> 2 & x< 20) 
+
+ggplot(data = diamonds1, mapping = aes(x = x, y = price)) +
+    geom_boxplot(aes(group = cut_width(x, 2)))
+```
+
+```{r}
+diamonds2 = diamonds %>% filter(y > 2 & y < 20) 
+
+ggplot(data = diamonds2, mapping = aes(x = y, y = price)) +
+    geom_boxplot(aes(group = cut_width(y, 2)))
+```
+
+
+
+```{r}
+diamonds3 = diamonds %>% filter(z > 2 & z < 20) 
+
+ggplot(data = diamonds3, mapping = aes(x = z, y = price)) +
+    geom_boxplot(aes(group = cut_width(z, 2)))
+```
+
+
+
+
+**123-1**
+How can you tell if an object is a tibble?
+
+```{r}
+x = tibble()
+y = 'not a tibble'
+
+is.tibble(x)
+is.tibble(y)
+```
+
+**124-3**
+If you have the name of a variable stored in an object, e.g. var <- "mpg", how can you extract the reference variable from a tibble?
+
+```{r}
+tibble(var="mpg")$var
+```
