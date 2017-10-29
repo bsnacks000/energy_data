@@ -1,6 +1,8 @@
 ---
 title: "Exploratory Data Analysis"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
 ---
 
 ### Chapter 5
