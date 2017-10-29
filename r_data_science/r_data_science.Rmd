@@ -95,7 +95,7 @@ ggplot(price) + geom_histogram(aes(x=price),binwidth=25)+
 
 The summary data and overall shape of the histogram shows a right skewed distribution. There is a higher frequency of prices below 1000.
 
-Although high binwidths reflect this assessment, certain details in the shape of the distribution become evident only as binwidth is increased. As the resolution is increased a gap emerges in the dataset. This shows a certain price range was excluded from the dataset which might have an impact on the mean and median of the distribution.
+Although high binwidths reflect this assessment, certain details in the shape of the distribution become evident only as binwidth is increased. As the resolution is increased a gap emerges in the dataset. This shows a certain price range was excluded from the dataset which might have an impact on the mean(red) and median(orange) of the distribution.
 
 
 **93-2**
@@ -144,6 +144,10 @@ ggplot(data = diamonds, mapping = aes(x=reorder(cut,price,FUN=median),y=price, f
 
 ```
 
+The original boxplot above shows the relationship between cut and price in the dataset. When reording based on median, we see that fair diamonds outperform all other cuts in the ordinal factor. This could be an indication that another variable that is positively correlated with price is also positively correlated with fair-cut diamonds.
+
+Using cor() we see that carat and price are highly correlated. A regression analysis confirms that carat is predictive of price and a quick plot shows that these are positively correlated. 
+
 ```{r}
 cor(diamonds$carat, diamonds$price) # extreme correlation between carat and price
 ```
@@ -167,6 +171,10 @@ ggplot(data=diamonds, aes(reorder(cut,carat,FUN=median),y=carat, fill=cut)) +
     geom_boxplot()
 
 ```
+
+If we use a boxplot we can see that fair diamonds also have the highest median distribution and widest spread in their relationship to carat. Since fair diamonds have the highest median distribution to carat and carat is highly correlated with price, fair cut diamonds are also highly correlated with price.   
+
+
 **104-3**
 
 How does the price distribution of very large diamonds compare to small diamonds. Is it as you expect, or does it surprise you?
@@ -194,11 +202,15 @@ ggplot(data = diamonds3, mapping = aes(x = z, y = price)) +
     geom_boxplot(aes(group = cut_width(z, 2)))
 ```
 
+After binning the dimension variables x, y and z, we can see that larger sized diamonds have a much wider price distribution than smaller diamonds. 
 
+This is not surprising since larger diamonds will most likely have the most variety in terms of color, clarity, cut and other characteristics. 
 
 
 **123-1**
 How can you tell if an object is a tibble?
+
+Using the is.tibble() method.
 
 ```{r}
 x = tibble()
@@ -210,6 +222,8 @@ is.tibble(y)
 
 **124-3**
 If you have the name of a variable stored in an object, e.g. var <- "mpg", how can you extract the reference variable from a tibble?
+
+Not exactly sure what this question is getting at, but this is how to get a variable out of dataframe. It will work on a tibble as well.
 
 ```{r}
 tibble(var="mpg")$var
