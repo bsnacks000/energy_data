@@ -1,0 +1,223 @@
+---
+title: "Benchmarking and Citibike Data "
+output:
+  html_document:
+    df_print: paged
+---
+
+This project is a comparison and exploratory analysis of 2016 NYC Benchmarking dataset and Citibike usage data for the summer of 2016. The purpose of this research is to attempt to find if there is a potential relationship between energy usage and bike usage across each of the 5 boroughs. This is made under the presumption that New Yorkers in neighborhoods with access to citi-bikes and who are actively pursuing alternative transportation may also be attempting to lower their environmental impact by saving energy and trying to lower greenhouse gas emmissions.  
+
+Since it is impossible to make a direct one to one relationship between building records and bike trip data, both datasets will be binned by borough and aggregated for direct comparison. Average trip duration and average site EUI will be the primary consideration in the analysis, though direct greenhouse gas emissions will also be used as a comparison. Since both Staten Island and the Bronx are not yet part of the citi-bike program and currently have no trip data, these boroughs will serve as a useful control. The goal is to see if neighborhoods with more documented time spent using alternative transportation see an effect on average site eui and green house gas emissions.
+
+
+### Cleaning and Binning
+
+The yearly [Citibike dataset](https://www.citibikenyc.com/system-data) is quite large. Just two months of data contain over 2.8 million trips. June and July were chosen since people are most likely more actively riding in those months.
+
+
+```{r}
+library(tidyverse)
+
+benchmarking_csv = file.path(getwd(),'data', 'nyc_benchmarking_disclosure_data_reported_in_2016.csv')
+
+citi_bike_csv_path= c(
+    file.path(getwd(),'data', '201606-citibike-tripdata.csv'),
+    file.path(getwd(),'data', '201607-citibike-tripdata.csv')
+)
+
+citi_df = as.tibble(data.frame())
+for (path in citi_bike_csv_path){
+    citi_df = rbind(citi_df, as.tibble(read.csv(path,stringsAsFactors=F, strip.white=T)))
+}
+# saveRDS(object = citi_df,'citibike-summer16.rds')
+
+bench_df = as.tibble(read.csv(benchmarking_csv,stringsAsFactors=F, strip.white=T))
+```
+
+
+The benchmark dataset is filtered to include just site EUI and direct GHG emissions. The citibike set is filtered to include trip duration and station location. An extra id field is added in order to identify unique records for de-duplication in the binning process. 
+
+```{r}
+bench_filtered_df = bench_df %>% filter(Borough != 'Not Available') %>%             
+    select(Record.Number, Borough,Reported.NYC.Building.Identification.Numbers..BINs., 
+           Site.EUI..kBtu.ft..,Direct.GHG.Emissions..Metric.Tons.CO2e.)
+colnames(bench_filtered_df) = c('record_number', 'borough', 'bin', 'site_eui','direct_ghg') # clean col names
+
+citi_df$record_id = seq.int(nrow(citi_df))
+citi_filtered_df = citi_df %>% select(record_id, tripduration, start.station.id, start.station.latitude, start.station.longitude)
+
+```
+
+
+A difficulty with the citibike dataset is that it uses geolocation instead of borough tags. Therefore in order to group_by and join on the benchmarking data geo coordinates for each borough were approximated for each borough using Google Maps. 
+
+According to the current [citibike map](https://member.citibikenyc.com/map/) there are no citibike stations in Staten Island or the Bronx, so only BK, MN and QNs were binned. Note that only the northern neighborhoods of Brooklyn and the western neighborhoods in Queens contained extensive coverage.  
+
+```{r}
+# brooklyn bins
+bkbin1_lower = citi_filtered_df %>% 
+    filter((start.station.latitude <= 40.697416) & (start.station.latitude >= 40.641289)) # lower brooklyn -redhook, bkheights etc. 
+bkbin2_dumbo = citi_filtered_df %>% 
+    filter((start.station.latitude <= 40.706061) & (start.station.latitude >= 40.697416)) %>%
+    filter(start.station.longitude >= -73.999058) # covers dumbo
+bkbin3_wburg = citi_filtered_df %>% 
+    filter((start.station.latitude <= 40.736894)& (start.station.latitude >= 40.706061)) %>% 
+    filter(start.station.longitude >= -73.969876) # covers w-burg 
+
+bk_total = bkbin1_lower %>% bind_rows(bkbin2_dumbo) %>% bind_rows(bkbin3_wburg) %>% distinct()
+bk_total['borough'] = 'Brooklyn'
+```
+
+
+```{r}
+# queens bins 
+qnsbin1_lic = citi_filtered_df %>% 
+    filter((start.station.latitude <= 40.75312) & (start.station.latitude >= 40.736894)) %>% 
+    filter(start.station.longitude >= -73.958031)
+
+qnsbin2_astoria = citi_filtered_df %>% 
+    filter((start.station.latitude <= 40.783476) & (start.station.latitude >= 40.75312)) %>% 
+    filter(start.station.longitude >= -73.938719)
+
+qns_total = qnsbin1_lic %>% bind_rows(qnsbin2_astoria) %>% distinct()
+qns_total['borough'] = 'Queens'
+```
+
+
+```{r}
+mnbin1_battery = citi_filtered_df %>% 
+    filter((start.station.latitude <=40.714356 ) & ( start.station.latitude >= 40.702384)) %>%
+    filter((start.station.longitude >= -74.02178) &( start.station.longitude <= -73.999058))
+
+mbin2_midtown = citi_filtered_df %>% 
+    filter((start.station.latitude <=40.756110) & ( start.station.latitude >= 40.714356)) %>%
+    filter((start.station.longitude >= -74.013650) &( start.station.longitude <= -73.967988))
+
+mbin3_central = citi_filtered_df %>% 
+    filter((start.station.latitude <=40.796018) & ( start.station.latitude >= 40.756110)) %>%
+    filter((start.station.longitude >= -73.989789) &( start.station.longitude <= -73.949277))
+
+mbin4_upper = citi_filtered_df %>% 
+    filter((start.station.latitude <=40.830057) & ( start.station.latitude >= 40.796018)) %>%
+    filter((start.station.longitude >= -73.978802) &( start.station.longitude <= -73.940267))
+
+mn_total = mnbin1_battery %>% bind_rows(mbin2_midtown) %>% bind_rows(mbin3_central) %>% bind_rows(mbin4_upper) %>% distinct()
+mn_total['borough'] = 'Manhattan'
+
+```
+
+Finally all the citi dataframes are merged to create a binned citibike dataset.
+```{r}
+citi_binned_df = mn_total %>% bind_rows(bk_total) %>% bind_rows(qns_total)
+```
+
+### Summary statistics for City-wide filtered datasets
+Outliers less than 500 kbtu were eliminated from site_eui and direct_ghg.
+
+Site EUI shows a highly normal distribution, while direct GHG emissions appears to multi-modal with a second peak closer to zero. This is an indication that any future statistical work that focuses on GHG emissions should be properly binned into two seperate normal distributions.
+
+```{r}
+# remove outliers < 500 site and direct_ghg
+bench_filtered_df = bench_filtered_df %>% filter( site_eui < 500 & site_eui > 0) %>% filter( direct_ghg < 500 & direct_ghg > 0)
+summary(bench_filtered_df[c('site_eui', 'direct_ghg')])
+
+```
+
+
+#### Frequency Distribution of Site EUI city-wide 
+
+```{r}
+ggplot(data=bench_filtered_df, aes(x=site_eui)) +  geom_histogram(binwidth = 10) +
+    geom_vline(xintercept=78, colour='red', linetype=2) +  # mean
+    geom_vline(xintercept=77, colour='orange', linetype=2) + # median 
+    geom_vline(xintercept=60, colour='light blue') +
+    geom_vline(xintercept=94, colour='light blue')
+```
+
+#### Frequency Distribution of Direct GHG emissions city-wide
+
+
+```{r}
+ggplot(data=bench_filtered_df, aes(x=direct_ghg)) +  geom_histogram(binwidth = 10) +
+    geom_vline(xintercept=252, colour='red', linetype=2) +  # mean
+    geom_vline(xintercept=256, colour='orange', linetype=2) + # median 
+    geom_vline(xintercept=164, colour='light blue') +
+    geom_vline(xintercept=348, colour='light blue')
+```
+
+
+Trip durations of less then 5000 seconds were kept in the dataset for comparison. The trip duration data shows a normal, right-skewed distribution.
+
+```{r}
+citi_binned_df = citi_binned_df %>% filter(tripduration < 5000)
+summary(citi_binned_df[[c('tripduration')]])
+```
+
+
+#### Citibike Trip duration City-wide frequency distribution
+```{r}
+ggplot(data=citi_binned_df, aes(x=tripduration)) +  geom_histogram(binwidth = 30) +
+    geom_vline(xintercept=840, colour='red', linetype=2) +  # mean
+    geom_vline(xintercept=662, colour='orange', linetype=2) + # median 
+    geom_vline(xintercept=398, colour='light blue') +
+    geom_vline(xintercept=1118, colour='light blue')
+```
+
+### By Borough Aggregated Distributions
+Constructing a joined dataframe of aggregated borough data from both datasets 
+
+```{r}
+count_df = citi_binned_df %>% group_by(borough) %>% count() %>% rename(trip_count=n)
+avg_df = citi_binned_df %>% group_by(borough) %>% summarise(avg_trip_duration=mean(tripduration))
+
+citi_agg_df = left_join(count_df, avg_df, by='borough') 
+agg_bench_df = bench_filtered_df %>% select(borough, site_eui, direct_ghg) %>% group_by(borough) %>% summarise_all(funs(mean))
+agg_citi_bench_df = left_join(agg_bench_df,citi_agg_df,  by='borough')
+agg_citi_bench_df[is.na(agg_citi_bench_df)] = 0
+```
+
+
+```{r}
+agg_citi_bench_df
+```
+
+The by borough breakdown of site eui and direct green house gas emissions shows that boroughs score slightly worse in site EUI than Manhattan, Queens and Brooklyn. The Bronx shows the highest overall direct GHG emissions and second highest site EUI emissions while Staten Island shows the highest site EUI. Queens has the highest trip duration and second lowest site eui.
+
+
+```{r}
+ggplot(data=bench_filtered_df,aes(x=reorder(borough,site_eui,FUN=mean),y=site_eui, fill=borough)) + geom_boxplot() + 
+    xlab('Site EUI emissions by Borough (asc by mean)')
+```
+
+```{r}
+ggplot(data=bench_filtered_df,aes(x=reorder(borough,direct_ghg,FUN=mean),y=direct_ghg, fill=borough)) + geom_boxplot() +
+    xlab('Direct GHG Distributions by Borough (asc by mean)')
+```
+
+
+```{r}
+ggplot(data=citi_binned_df %>% filter(tripduration<3000), aes(x=reorder(borough,tripduration,FUN=mean),y=tripduration, fill=borough)) + geom_boxplot() + xlab('Borough (asc by mean)')
+
+```
+
+The complete representation is given below. The circles represent mean site eui by borrough across the entire benchmarking dataset. The size of each circle is relative to that borough's average trip duration. The average site eui tends to decrease in the boroughs with the higher average trip durations. 
+
+```{r}
+ggplot() +
+    geom_point(data=bench_filtered_df, aes(reorder(borough,-site_eui,FUN=mean),y=site_eui, color=direct_ghg), alpha=0.1) + 
+    geom_point(data=agg_citi_bench_df, aes(reorder(borough,site_eui),y=site_eui,size=avg_trip_duration), group=1, colour='black') + 
+    ylim(c(0,225)) +
+    scale_colour_gradient(low = "white", high = "blue")  + 
+    xlab('Highest average site_eui by borough and avg trip duration (sec)')
+
+```
+
+### Conclusions and Future Work
+
+While the above exploratory analysis shows a basic tendency, it is by no means robust, though it could be a starting point for a more in-depth project. There does seem to be a loose relationship between site eui and alternative transportation across the boroughs, though the groups are joined too broadly represented to do any serious statistical analysis. 
+
+Each borough in the city is highly diverse. A borough wide aggregation does little to account the social and fiscal character of individual neighborhoods. Other than Manhattan, citi-bike data is limited to only the more gentrified neighborhoods in Queens. Doing a similiar breakdown and evaluation on a smaller scale, 15 to 20 neighborhoods as opposed to 5 boroughs, would yield a much richer dataset and one that would open up the door to correlation and regression analysis.
+
+In order to do this, geo-locations for each building would need to be available as well as a more precise methodology for binning the neighborhoods.
+
+
