@@ -1,0 +1,46 @@
+---
+title: "Harvard plots"
+output: html_notebook
+---
+
+```{r}
+require(tidyverse)
+hdi_path = file.path(getwd(), 'data', 'EconomistData.csv')
+
+```
+
+
+### Exercise I
+Creating the HDI scatter plot 
+
+```{r}
+df = read.csv(hdi_path)
+
+ggplot(df, aes(x=CPI, y=HDI, color=Region, size=HDI.Rank)) + geom_point()
+
+```
+
+
+### Exercise II
+
+```{r}
+ggplot(df, aes(x=CPI, y=HDI)) + geom_point()+ 
+    geom_smooth(color='red')+ 
+    geom_smooth(method='lm')
+```
+
+
+### Exercise III
+
+```{r}
+
+ggplot(df, aes(x=CPI, y=HDI, color=Region)) + 
+    geom_point() +
+    ylab('Human Development Index') +
+    xlab('Corruption Perceptions Index') +
+    labs(col='Global Region') + 
+    ggtitle('CPI vs HPI Throughout Global Regions') +
+    scale_color_manual(values=c('red', 'yellow', 'blue', 'green', 'purple', 'pink'))
+
+```
+
