@@ -1,6 +1,8 @@
 ---
 title: "Harvard plots"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
 ---
 
 ```{r}
@@ -23,6 +25,8 @@ ggplot(df, aes(x=CPI, y=HDI, color=Region, size=HDI.Rank)) + geom_point()
 
 ### Exercise II
 
+Adding smoothing lines 
+
 ```{r}
 ggplot(df, aes(x=CPI, y=HDI)) + geom_point()+ 
     geom_smooth(color='red')+ 
@@ -31,6 +35,8 @@ ggplot(df, aes(x=CPI, y=HDI)) + geom_point()+
 
 
 ### Exercise III
+
+Coloring and Labels
 
 ```{r}
 
